@@ -9,7 +9,7 @@
 
 namespace {
 
-constexpr int MAX_BTREE_DEPTH = 32;   // guards against corrupt/cyclic interior pages
+constexpr int MAX_BTREE_DEPTH = 32;  // guards against corrupt/cyclic interior pages
 constexpr uint32_t MAX_RECORD_HEADER = 512;
 
 // Byte length of a value with the given SQLite serial type.
@@ -269,8 +269,8 @@ bool MiniSqlite::readU32BE(uint64_t offset, uint32_t& out) {
   if (!readAt(offset, b, 4)) {
     return false;
   }
-  out = (static_cast<uint32_t>(b[0]) << 24) | (static_cast<uint32_t>(b[1]) << 16) |
-        (static_cast<uint32_t>(b[2]) << 8) | b[3];
+  out = (static_cast<uint32_t>(b[0]) << 24) | (static_cast<uint32_t>(b[1]) << 16) | (static_cast<uint32_t>(b[2]) << 8) |
+        b[3];
   return true;
 }
 

@@ -40,8 +40,8 @@ bool JwpubManifest::parse(const char* json) {
   title = pub["title"].as<std::string>();
   symbol = pub["symbol"].as<std::string>();
   year = pub["year"].as<int>();
-  issueTagNumber = pub["issueTagNumber"] | 0;                 // absent -> 0
-  mepsLanguageIndex = pub["language"] | -1;                   // absent -> -1 (invalid)
+  issueTagNumber = pub["issueTagNumber"] | 0;  // absent -> 0
+  mepsLanguageIndex = pub["language"] | -1;    // absent -> -1 (invalid)
 
   LOG_DBG("JWMANIFEST", "symbol=%s year=%d issue=%d lang=%d fmt=%s", symbol.c_str(), year, issueTagNumber,
           mepsLanguageIndex, contentFormat.c_str());

@@ -10,8 +10,13 @@ struct RecentBook;
 struct Rect;
 
 class HomeActivity final : public Activity {
+ public:
+  static constexpr int kCarouselFrameCount = 3;
+
+ private:
   ButtonNavigator buttonNavigator;
   int selectorIndex = 0;
+  int lastCarouselBookIndex = 0;  // remembered position when leaving the carousel row
   bool recentsLoading = false;
   bool recentsLoaded = false;
   bool firstRenderDone = false;
@@ -27,6 +32,11 @@ class HomeActivity final : public Activity {
   int coverRectY = 0;
   int coverRectW = 0;
   int coverRectH = 0;
+
+  // Aliases into the static carousel frame cache (see HomeActivity.cpp)
+  uint8_t* carouselFrames[kCarouselFrameCount] = {nullptr, nullptr, nullptr};
+  bool carouselFramesReady = false;
+
   std::vector<RecentBook> recentBooks;
   const HomeMenuItem initialMenuItem;
 
@@ -66,6 +76,10 @@ class HomeActivity final : public Activity {
   bool storeCoverBuffer();    // Store frame buffer for cover image
   bool restoreCoverBuffer();  // Restore frame buffer from stored cover
   void freeCoverBuffer();     // Free the stored cover buffer
+  void preRenderCarouselFrames();
+  void freeCarouselFrames();
+  void renderCarouselFrame(int bookIdx, int slotIdx);
+  void updateSlidingWindowCache(int centerIdx, int bookCount);
   void loadRecentBooks(int maxBooks);
   void loadRecentCovers(int coverHeight);
 

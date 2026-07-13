@@ -246,6 +246,9 @@ class BaseTheme {
                                const char* secondaryLabel = nullptr, KeyboardKeyType keyType = KeyboardKeyType::Normal,
                                bool inactiveSelection = false) const;
   virtual bool showsFileIcons() const { return false; }
+  // Overlay hook for themes with a pre-rendered home cover strip (LyraCarousel):
+  // draws the selection border on top of a frame restored from cache.
+  virtual void drawCarouselBorder(GfxRenderer&, Rect, bool) const {}
 
   // Shared constants and helpers for battery drawing (used by all themes)
   static constexpr int batteryPercentSpacing = 4;

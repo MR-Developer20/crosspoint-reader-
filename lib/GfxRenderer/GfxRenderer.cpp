@@ -890,6 +890,24 @@ void GfxRenderer::maskRoundedRectOutsideCorners(const int x, const int y, const 
     return;
   }
 
+  // Clip in logical space — callers may mask a rect that intentionally bleeds
+  // off-screen (e.g. LyraCarousel side covers), and drawPixel logs an error
+  // for every out-of-range pixel.
+  const int screenW = getScreenWidth();
+  const int screenH = getScreenHeight();
+  const auto plot = [&](const int px, const int py) {
+    if (px < 0 || px >= screenW || py < 0 || py >= screenH) {
+      return;
+    }
+    if (color == Color::White || color == Color::Black) {
+      drawPixel(px, py, color == Color::Black);
+    } else if (color == Color::LightGray) {
+      drawPixelDither<Color::LightGray>(px, py);
+    } else if (color == Color::DarkGray) {
+      drawPixelDither<Color::DarkGray>(px, py);
+    }
+  };
+
   const int rr = radius - 1;
   const int rr2 = rr * rr;
   for (int dy = 0; dy < radius; dy++) {
@@ -897,23 +915,10 @@ void GfxRenderer::maskRoundedRectOutsideCorners(const int x, const int y, const 
       const int tx = rr - dx;
       const int ty = rr - dy;
       if (tx * tx + ty * ty > rr2) {
-        if (color == Color::White || color == Color::Black) {
-          bool state = color == Color::Black;
-          drawPixel(x + dx, y + dy, state);                           // top-left
-          drawPixel(x + width - 1 - dx, y + dy, state);               // top-right
-          drawPixel(x + dx, y + height - 1 - dy, state);              // bottom-left
-          drawPixel(x + width - 1 - dx, y + height - 1 - dy, state);  // bottom-right
-        } else if (color == Color::LightGray) {
-          drawPixelDither<Color::LightGray>(x + dx, y + dy);                           // top-left
-          drawPixelDither<Color::LightGray>(x + width - 1 - dx, y + dy);               // top-right
-          drawPixelDither<Color::LightGray>(x + dx, y + height - 1 - dy);              // bottom-left
-          drawPixelDither<Color::LightGray>(x + width - 1 - dx, y + height - 1 - dy);  // bottom-right
-        } else if (color == Color::DarkGray) {
-          drawPixelDither<Color::DarkGray>(x + dx, y + dy);                           // top-left
-          drawPixelDither<Color::DarkGray>(x + width - 1 - dx, y + dy);               // top-right
-          drawPixelDither<Color::DarkGray>(x + dx, y + height - 1 - dy);              // bottom-left
-          drawPixelDither<Color::DarkGray>(x + width - 1 - dx, y + height - 1 - dy);  // bottom-right
-        }
+        plot(x + dx, y + dy);                           // top-left
+        plot(x + width - 1 - dx, y + dy);               // top-right
+        plot(x + dx, y + height - 1 - dy);              // bottom-left
+        plot(x + width - 1 - dx, y + height - 1 - dy);  // bottom-right
       }
     }
   }
@@ -1069,6 +1074,23 @@ void GfxRenderer::drawIcon(const uint8_t bitmap[], const int x, const int y, con
       const bool ink = ((byte >> (7 - (col & 7))) & 1) == 0;
       if (ink) {
         drawPixel(x + (size - 1 - row), y + col, true);
+      }
+    }
+  }
+}
+
+void GfxRenderer::drawIconInverted(const uint8_t bitmap[], const int x, const int y, const int size) const {
+  // Same per-pixel plot and (size-1-row, col) mapping as drawIcon, but ink
+  // pixels are drawn white instead of black — for icons sitting on a solid
+  // black selection highlight. Non-ink pixels stay transparent so the
+  // highlight shows through.
+  const int rowBytes = (size + 7) / 8;
+  for (int row = 0; row < size; row++) {
+    for (int col = 0; col < size; col++) {
+      const uint8_t byte = bitmap[row * rowBytes + (col >> 3)];
+      const bool ink = ((byte >> (7 - (col & 7))) & 1) == 0;
+      if (ink) {
+        drawPixel(x + (size - 1 - row), y + col, false);
       }
     }
   }

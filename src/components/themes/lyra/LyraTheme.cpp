@@ -40,7 +40,9 @@ constexpr int listIconSize = 24;
 constexpr int mainMenuColumns = 2;
 int coverWidth = 0;
 
-const uint8_t* iconForName(UIIcon icon, int size) {
+}  // namespace
+
+const uint8_t* LyraTheme::iconForName(UIIcon icon, int size) {
   if (size == 24) {
     switch (icon) {
       case UIIcon::Folder:
@@ -82,7 +84,6 @@ const uint8_t* iconForName(UIIcon icon, int size) {
   }
   return nullptr;
 }
-}  // namespace
 
 void LyraTheme::fillBatteryIcon(const GfxRenderer& renderer, Rect rect, uint16_t percentage) const {
   const bool charging = gpio.isUsbConnected();

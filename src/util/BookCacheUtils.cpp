@@ -2,6 +2,7 @@
 
 #include <Epub.h>
 #include <FsHelpers.h>
+#include <Jwpub.h>
 #include <Logging.h>
 #include <Txt.h>
 #include <Xtc.h>
@@ -14,10 +15,12 @@ bool isBookCacheDirectoryName(const char* name) {
   constexpr char EPUB_PREFIX[] = "epub_";
   constexpr char TXT_PREFIX[] = "txt_";
   constexpr char XTC_PREFIX[] = "xtc_";
+  constexpr char JWPUB_PREFIX[] = "jwpub_";
 
   return strncmp(name, EPUB_PREFIX, std::size(EPUB_PREFIX) - 1) == 0 ||
          strncmp(name, TXT_PREFIX, std::size(TXT_PREFIX) - 1) == 0 ||
-         strncmp(name, XTC_PREFIX, std::size(XTC_PREFIX) - 1) == 0;
+         strncmp(name, XTC_PREFIX, std::size(XTC_PREFIX) - 1) == 0 ||
+         strncmp(name, JWPUB_PREFIX, std::size(JWPUB_PREFIX) - 1) == 0;
 }
 
 void clearBookCache(const std::string& path) {
@@ -27,6 +30,8 @@ void clearBookCache(const std::string& path) {
     Xtc(path, "/.crosspoint").clearCache();
   } else if (FsHelpers::hasTxtExtension(path)) {
     Txt(path, "/.crosspoint").clearCache();
+  } else if (FsHelpers::hasJwpubExtension(path)) {
+    Jwpub(path, "/.crosspoint").clearCache();
   } else {
     return;
   }

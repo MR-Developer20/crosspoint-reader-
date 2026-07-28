@@ -10,6 +10,7 @@
 #include "CrossPointSettings.h"
 #include "Epub.h"
 #include "EpubReaderActivity.h"
+#include "Jwpub.h"
 #include "SdCardFontSystem.h"
 #include "Txt.h"
 #include "TxtReaderActivity.h"
@@ -27,6 +28,8 @@ bool ReaderActivity::isTxtFile(const std::string& path) {
 }
 
 bool ReaderActivity::isBmpFile(const std::string& path) { return FsHelpers::hasBmpExtension(path); }
+
+bool ReaderActivity::isJwpubFile(const std::string& path) { return FsHelpers::hasJwpubExtension(path); }
 
 std::unique_ptr<Epub> ReaderActivity::loadEpub(const std::string& path) {
   if (!Storage.exists(path.c_str())) {
@@ -60,6 +63,50 @@ std::unique_ptr<Epub> ReaderActivity::loadEpub(const std::string& path) {
   }
 
   LOG_ERR("READER", "Failed to load epub");
+  return nullptr;
+}
+
+std::unique_ptr<Txt> ReaderActivity::loadJwpub(const std::string& path) {
+  if (!Storage.exists(path.c_str())) {
+    LOG_ERR("READER", "File does not exist: %s", path.c_str());
+    return nullptr;
+  }
+
+  auto jwpub = makeUniqueNoThrow<Jwpub>(path, "/.crosspoint");
+  if (!jwpub) {
+    LOG_ERR("READER", "Failed to allocate JWPUB object");
+    return nullptr;
+  }
+  // First open: extracting + decrypting every document into content.txt takes a few seconds.
+  // Show the indexing popup (as EPUB does); a cached open reuses content.txt in a blink.
+  const bool uncached = !Storage.exists(jwpub->getContentPath().c_str());
+  if (uncached) {
+    GUI.drawPopup(renderer, tr(STR_INDEXING));
+  }
+  bool loaded;
+  {
+    // Lend the framebuffer's 48 KB to the conversion (the inflate window claims from it).
+    std::optional<GfxRenderer::FrameBufferLoan> loan;
+    if (uncached) loan.emplace(renderer);
+    loaded = jwpub->load();
+  }
+  if (!loaded) {
+    LOG_ERR("READER", "Failed to load JWPUB");
+    return nullptr;
+  }
+
+  // Render the generated plaintext through the TXT reader, keeping the .jwpub path as the
+  // navigation identity so "back" returns to the book's folder rather than the cache.
+  auto txt = makeUniqueNoThrow<Txt>(jwpub->getContentPath(), "/.crosspoint", path);
+  if (!txt) {
+    LOG_ERR("READER", "Failed to allocate TXT wrapper for JWPUB");
+    return nullptr;
+  }
+  if (txt->load()) {
+    return txt;
+  }
+
+  LOG_ERR("READER", "Failed to load generated content.txt");
   return nullptr;
 }
 
@@ -151,6 +198,13 @@ void ReaderActivity::onEnter() {
     onGoToXtcReader(std::move(xtc));
   } else if (isTxtFile(initialBookPath)) {
     auto txt = loadTxt(initialBookPath);
+    if (!txt) {
+      onGoBack();
+      return;
+    }
+    onGoToTxtReader(std::move(txt));
+  } else if (isJwpubFile(initialBookPath)) {
+    auto txt = loadJwpub(initialBookPath);
     if (!txt) {
       onGoBack();
       return;

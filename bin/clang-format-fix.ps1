@@ -92,6 +92,7 @@ function Resolve-ClangFormat {
 $clangFormat = Resolve-ClangFormat
 
 $exclude = @(
+    'biscuit'
     'freeink-sdk'
     'lib\EpdFont\builtinFonts'
     'lib\Epub\Epub\hyphenation\generated'

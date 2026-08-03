@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>BISCUIT 8-BALL</title>
+<style>
+:root{--bg:#0a0a0a;--surf:#131313;--surf2:#1c1c1c;--fg:#e8e8e8;--dim:#8a8a8a;--acc:#FF8200;--ok:#38d66b;--bad:#ff4d4d;--bd:#2b2b2b;--felt:#0d5a2b}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:var(--bg);color:var(--fg);font-family:'Courier New',ui-monospace,Menlo,Consolas,monospace;overflow:hidden;-webkit-user-select:none;user-select:none;touch-action:none}
+body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:99;background:repeating-linear-gradient(transparent 0 2px,rgba(0,0,0,.18) 2px 3px);opacity:.5}
+.wrap{height:100%;display:flex;flex-direction:column;max-width:640px;margin:0 auto;padding:10px}
+.bar{display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid var(--bd);padding-bottom:7px;margin-bottom:8px}
+.brand{color:var(--acc);font-weight:700;letter-spacing:3px;font-size:14px}
+.stat{color:var(--dim);font-size:11px;letter-spacing:1px}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--bad);margin-right:5px}
+.dot.on{background:var(--ok)}
+.view{flex:1;display:none;flex-direction:column;overflow-y:auto}
+.view.on{display:flex}
+h1{font-size:13px;letter-spacing:3px;color:var(--acc);text-transform:uppercase;margin-bottom:12px}
+.card{background:var(--surf);border:2px solid var(--bd);padding:12px;margin-bottom:10px}
+.lbl{font-size:11px;letter-spacing:2px;color:var(--dim);text-transform:uppercase;margin-bottom:6px}
+input[type=text]{width:100%;background:#000;border:2px solid var(--acc);color:var(--fg);font-family:inherit;font-size:18px;padding:12px;letter-spacing:2px;text-transform:uppercase}
+button{font-family:inherit;font-size:14px;letter-spacing:2px;text-transform:uppercase;color:var(--fg);background:var(--surf2);border:2px solid var(--bd);padding:14px;cursor:pointer;width:100%}
+button.acc{border-color:var(--acc);color:var(--acc)}
+button.big{font-size:18px;padding:18px}
+button:disabled{opacity:.4}
+button:active{transform:translateY(1px)}
+.mid{flex:1;display:flex;flex-direction:column;justify-content:center}
+.center{text-align:center}
+.row{display:flex;gap:8px;margin-top:8px}
+.seats{display:flex;gap:10px;margin-bottom:8px}
+.seat{flex:1;border:2px solid var(--bd);padding:10px;text-align:center;font-size:13px}
+.seat.turn{border-color:var(--acc);color:var(--acc)}
+.seat .g{font-size:10px;color:var(--dim);letter-spacing:1px;margin-top:4px}
+#msg{min-height:18px;font-size:12px;letter-spacing:1px;color:var(--acc);text-align:center;margin:6px 0}
+.tablewrap{position:relative;width:100%}
+canvas{width:100%;display:block;background:var(--felt);border:6px solid #5a3a1a;border-radius:8px;touch-action:none}
+.hint{font-size:11px;color:var(--dim);text-align:center;margin-top:6px;letter-spacing:1px;min-height:14px}
+.pow{height:10px;background:var(--surf2);border:1px solid var(--bd);margin-top:8px;overflow:hidden}
+.pow > i{display:block;height:100%;width:0;background:var(--acc)}
+.tag{font-size:11px;color:var(--dim);letter-spacing:1px}
+.win{color:var(--ok)}
+.big-n{font-size:40px;text-align:center;color:var(--acc);font-weight:700}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="bar">
+    <span class="brand">BISCUIT 8-BALL</span>
+    <span class="stat"><span id="dot" class="dot"></span><span id="me">—</span></span>
+  </div>
+
+  <!-- JOIN -->
+  <section id="v-join" class="view on">
+    <div class="mid">
+      <h1>Enter Callsign</h1>
+      <div class="card"><input id="nick" type="text" maxlength="20" placeholder="YOUR NAME" autocomplete="off" autocapitalize="characters"></div>
+      <button id="joinBtn" class="acc big">Join Table</button>
+      <p class="tag center" style="margin-top:12px" id="joinInfo">Connecting to host...</p>
+    </div>
+  </section>
+
+  <!-- TABLE -->
+  <section id="v-table" class="view">
+    <div class="seats">
+      <div id="s0" class="seat"><div id="s0n">(open)</div><div id="s0g" class="g"></div></div>
+      <div id="s1" class="seat"><div id="s1n">(open)</div><div id="s1g" class="g"></div></div>
+    </div>
+    <div id="msg"></div>
+    <div class="tablewrap"><canvas id="cv"></canvas></div>
+    <div class="hint" id="hint"></div>
+    <div class="pow"><i id="powbar"></i></div>
+    <div class="row" id="controls"></div>
+  </section>
+
+  <!-- GAMEOVER -->
+  <section id="v-over" class="view">
+    <div class="mid center">
+      <h1>Game Over</h1>
+      <div id="overWho" class="big-n"></div>
+      <div class="row" style="margin-top:20px"><button id="rematchBtn" class="acc big">Rematch</button></div>
+      <p class="tag center" style="margin-top:12px">Or wait for the host to start the next game</p>
+    </div>
+  </section>
+</div>
+
+<script>
+(function(){
+"use strict";
+var $=function(id){return document.getElementById(id);};
+function show(v){['join','table','over'].forEach(function(n){$('v-'+n).classList.toggle('on',n===v);});}
+function esc(s){return String(s==null?'':s).replace(/[<>&]/g,function(c){return c==='<'?'&lt;':c==='>'?'&gt;':'&amp;';});}
+
+// ---- constants (table units, W=1.0 x H=0.5) ----
+var W=1.0,H=0.5,R=0.016,POCKET=0.028,MAXSPEED=2.6,MAXPULL=0.32;
+var POCKETS=[[0,0],[W/2,0],[W,0],[0,H],[W/2,H],[W,H]];
+var HUE={1:'#e6c419',2:'#1f4fd8',3:'#d8281f',4:'#7a1fd8',5:'#e2711d',6:'#1ea637',7:'#8a2d1f'};
+
+var ws=null,connected=false,mySeat=-1,myNick='';
+var meta={phase:'waiting',turn:0,yourTurn:false,ballInHand:false,winner:-1,players:[{},{}],spectators:0};
+var B=[]; for(var i=0;i<16;i++) B.push({id:i,x:0,y:0,pk:true,vx:0,vy:0});
+var lastSeq=-1, haveState=false;
+var mode='idle';          // idle | place | aim | sim
+var simReplay=false, snapTarget=null;
+var events=null;          // firstHit/rail collected during a live shot
+var aim={active:false,dx:0,dy:0,pow:0};
+var placePos=null;
+
+// ---- canvas ----
+var cv=$('cv'),ctx=cv.getContext('2d'),CW=0,CH=0,SC=1,OX=0,OY=0;
+function layout(){
+  var w=cv.clientWidth||300; var dpr=window.devicePixelRatio||1;
+  cv.width=Math.round(w*dpr); cv.height=Math.round(w*dpr*(H/W));
+  CW=cv.width; CH=cv.height; SC=CW/W; OX=0; OY=0;
+}
+function tx(x){return OX+x*SC;} function ty(y){return OY+y*SC;}
+function toTable(px,py){var r=cv.getBoundingClientRect();var dpr=window.devicePixelRatio||1;
+  return [ (px-r.left)*dpr/SC, (py-r.top)*dpr/SC ]; }
+window.addEventListener('resize',function(){layout();draw();});
+
+// ---- net ----
+function send(o){ if(ws&&ws.readyState===1) ws.send(JSON.stringify(o)); }
+function connect(){
+  var host=location.hostname||'192.168.4.1';
+  try{ ws=new WebSocket('ws://'+host+':81/'); }catch(e){ $('joinInfo').textContent='Connection failed'; return; }
+  ws.onopen=function(){ connected=true; $('dot').classList.add('on'); $('joinInfo').textContent='Connected. Enter a name and join.';
+    var seq=0; ws._hb=setInterval(function(){ if(ws.readyState===1) send({t:'ping',n:++seq}); },15000); };
+  ws.onclose=function(){ connected=false; $('dot').classList.remove('on'); $('joinInfo').textContent='Disconnected. Reload to retry.'; if(ws._hb)clearInterval(ws._hb); };
+  ws.onerror=function(){ connected=false; $('dot').classList.remove('on'); };
+  ws.onmessage=function(ev){ var m; try{m=JSON.parse(ev.data);}catch(e){return;} route(m); };
+}
+function route(m){
+  if(m.t==='pong') return;
+  if(m.t==='ping'){ send({t:'pong'}); return; }
+  if(m.t==='toast'){ $('msg').textContent=m.msg; return; }
+  if(m.t==='welcome'){ mySeat=m.seat; return; }
+  if(m.t==='state') onState(m);
+}
+
+// ---- state application ----
+function onState(m){
+  mySeat=m.you; meta=m;
+  W=m.W||W; H=m.H||H;
+  if($('me')) $('me').textContent = mySeat===0?'PLAYER 1':(mySeat===1?'PLAYER 2':'SPECTATOR');
+  // positions: snap or replay
+  var newSeq=m.shotSeq;
+  var target=m.balls;
+  if(!haveState || m.lastBy<0 || m.lastBy===mySeat || newSeq===lastSeq){
+    applyPositions(target); haveState=true;
+  } else {
+    // opponent/spectator: replay from our current positions then snap
+    startReplay(m);
+  }
+  lastSeq=newSeq;
+  renderMeta();
+  if(mode!=='sim') decideMode();
+  draw();
+}
+function applyPositions(arr){
+  arr.forEach(function(b){ var t=B[b.id]; t.x=b.x; t.y=b.y; t.pk=b.pk; t.vx=0; t.vy=0; });
+}
+function renderMeta(){
+  if(meta.phase==='gameover'){
+    show('over');
+    var w=meta.winner;
+    var nm = (meta.players[w]&&meta.players[w].nick)||'';
+    $('overWho').innerHTML = (w===mySeat)?'<span class="win">YOU WIN!</span>':esc(nm)+' wins';
+    $('rematchBtn').style.display = (mySeat>=0)?'':'none';
+    return;
+  }
+  show('table');
+  for(var s=0;s<2;s++){
+    var p=meta.players[s]||{};
+    $('s'+s+'n').textContent=p.nick||'(open)';
+    $('s'+s+'g').textContent=(p.group&&p.group!=='open')?p.group.toUpperCase():'';
+    $('s'+s).classList.toggle('turn', meta.phase==='playing'&&meta.turn===s);
+  }
+  $('msg').textContent=meta.message||'';
+  buildControls();
+}
+function buildControls(){
+  var c=$('controls'); c.innerHTML='';
+  function btn(label,fn,acc){var b=document.createElement('button');b.textContent=label;if(acc)b.className='acc';b.onclick=fn;c.appendChild(b);}
+  if(meta.phase==='waiting'){
+    if(mySeat<0 && (!meta.players[0].nick||!meta.players[1].nick)) btn('Take Seat',function(){send({t:'sit'});});
+    if(mySeat>=0) btn('Stand',function(){send({t:'stand'});});
+    if(mySeat>=0 && meta.players[0].nick && meta.players[1].nick) btn('Start',function(){send({t:'start'});},true);
+  }
+}
+
+// ---- mode / input ----
+function decideMode(){
+  if(meta.phase!=='playing' || mySeat<0 || !meta.yourTurn){ mode='idle'; setHint(''); return; }
+  if(meta.ballInHand && !placePos){ mode='place'; setHint('Tap to place the cue ball'); return; }
+  mode='aim'; setHint('Drag from the cue ball to aim & set power, release to shoot');
+}
+function setHint(h){ $('hint').textContent=h; }
+function powBar(p){ $('powbar').style.width=(p*100)+'%'; }
+
+function cueBall(){ return B[0]; }
+function inBounds(x,y){ return x>R&&x<W-R&&y>R&&y<H-R; }
+function overlapsAny(x,y,skip){
+  for(var i=0;i<16;i++){ if(i===skip||B[i].pk) continue; var dx=B[i].x-x,dy=B[i].y-y; if(dx*dx+dy*dy<(2*R)*(2*R)) return true; }
+  return false;
+}
+
+function onDown(px,py){
+  if(mode==='place'){
+    var p=toTable(px,py); var x=Math.max(R,Math.min(W-R,p[0])),y=Math.max(R,Math.min(H-R,p[1]));
+    if(inBounds(x,y)&&!overlapsAny(x,y,0)){ cueBall().x=x; cueBall().y=y; placePos=[x,y]; decideMode(); draw(); }
+    return;
+  }
+  if(mode==='aim'){ aim.active=true; onMove(px,py); }
+}
+function onMove(px,py){
+  if(mode==='aim'&&aim.active){
+    var p=toTable(px,py); var cb=cueBall();
+    var dx=p[0]-cb.x, dy=p[1]-cb.y; var d=Math.hypot(dx,dy)||1e-6;
+    aim.dx=dx/d; aim.dy=dy/d; aim.pow=Math.min(d,MAXPULL)/MAXPULL;
+    powBar(aim.pow); draw();
+  }
+}
+function onUp(){
+  if(mode==='aim'&&aim.active){
+    aim.active=false;
+    if(aim.pow>0.06){ shoot(aim.dx*MAXSPEED*aim.pow, aim.dy*MAXSPEED*aim.pow); }
+    else { powBar(0); draw(); }
+  }
+}
+cv.addEventListener('pointerdown',function(e){e.preventDefault();onDown(e.clientX,e.clientY);});
+cv.addEventListener('pointermove',function(e){e.preventDefault();onMove(e.clientX,e.clientY);});
+cv.addEventListener('pointerup',function(e){e.preventDefault();onUp();});
+cv.addEventListener('pointercancel',function(){aim.active=false;});
+
+// ---- physics ----
+function anyMoving(){ for(var i=0;i<16;i++){ if(B[i].pk)continue; if(Math.abs(B[i].vx)>1e-4||Math.abs(B[i].vy)>1e-4) return true;} return false; }
+function step(h){
+  var b;
+  for(var i=0;i<16;i++){ b=B[i]; if(b.pk)continue;
+    b.x+=b.vx*h; b.y+=b.vy*h;
+    // pocket capture
+    for(var k=0;k<6;k++){ var dx=b.x-POCKETS[k][0],dy=b.y-POCKETS[k][1]; if(dx*dx+dy*dy<POCKET*POCKET){ b.pk=true; b.vx=b.vy=0; break; } }
+    if(b.pk) continue;
+    // cushions
+    if(b.x<R){b.x=R;b.vx=-b.vx*0.9;railHit(i);} else if(b.x>W-R){b.x=W-R;b.vx=-b.vx*0.9;railHit(i);}
+    if(b.y<R){b.y=R;b.vy=-b.vy*0.9;railHit(i);} else if(b.y>H-R){b.y=H-R;b.vy=-b.vy*0.9;railHit(i);}
+    // friction
+    b.vx*=0.992; b.vy*=0.992;
+    if(Math.abs(b.vx)<1e-4)b.vx=0; if(Math.abs(b.vy)<1e-4)b.vy=0;
+  }
+  // ball-ball
+  for(var a=0;a<16;a++){ if(B[a].pk)continue; for(var c=a+1;c<16;c++){ if(B[c].pk)continue;
+    var A=B[a],C=B[c]; var dx=C.x-A.x,dy=C.y-A.y; var dd=dx*dx+dy*dy;
+    if(dd< (2*R)*(2*R) && dd>1e-9){
+      var d=Math.sqrt(dd),nx=dx/d,ny=dy/d;
+      var rel=(C.vx-A.vx)*nx+(C.vy-A.vy)*ny;
+      if(rel<0){ var j=-(1.92)*rel/2; A.vx-=j*nx;A.vy-=j*ny; C.vx+=j*nx;C.vy+=j*ny; }
+      var ov=2*R-d; A.x-=nx*ov/2; A.y-=ny*ov/2; C.x+=nx*ov/2; C.y+=ny*ov/2;
+      if(events && !events.firstHit && (a===0||c===0)){ events.firstHit=(a===0)?C.id:A.id; }
+    }
+  }}
+}
+function railHit(i){ if(events&&events.firstHit) events.rail=true; }
+
+// ---- shot lifecycle ----
+function shoot(vx,vy){
+  events={firstHit:0,rail:false};   // firstHit 0 means "none yet" (cue is id 0, never an object first-hit target)
+  cueBall().vx=vx; cueBall().vy=vy;
+  mode='sim'; simReplay=false; setHint('');
+  runSim(function(){ finishLiveShot(vx,vy); });
+}
+function startReplay(m){
+  // keep current object positions as pre-shot; drive the cue from the shot params
+  applyPositionsExceptCue(); // no-op placeholder; current B already holds pre-shot
+  var cb=cueBall(); cb.pk=false; cb.x=m.lcx; cb.y=m.lcy; cb.vx=m.lvx; cb.vy=m.lvy;
+  events=null; snapTarget=m.balls; mode='sim'; simReplay=true; setHint('');
+  runSim(function(){ applyPositions(snapTarget); snapTarget=null; mode='idle'; decideMode(); draw(); });
+}
+function applyPositionsExceptCue(){ /* B already holds our last-synced positions */ }
+
+var raf=null;
+function runSim(done){
+  var acc=0,last=null,H_STEP=1/240;
+  function frame(ts){
+    if(last===null)last=ts; var dt=Math.min((ts-last)/1000,0.05); last=ts; acc+=dt;
+    var guard=0;
+    while(acc>=H_STEP && guard<600){ step(H_STEP); acc-=H_STEP; guard++; }
+    draw();
+    if(anyMoving()){ raf=requestAnimationFrame(frame); }
+    else { raf=null; done(); }
+  }
+  raf=requestAnimationFrame(frame);
+}
+function finishLiveShot(vx,vy){
+  // gather final positions + events, report to server
+  var balls=[]; for(var i=0;i<16;i++) balls.push({id:i,x:round(B[i].x),y:round(B[i].y),pk:B[i].pk});
+  var fh = (events&&events.firstHit)?events.firstHit:-1;
+  var rail = !!(events&&events.rail);
+  send({t:'shot',balls:balls,firstHit:fh,rail:rail,vx:round(vx),vy:round(vy)});
+  placePos=null; powBar(0); mode='idle'; setHint('Shot sent...');
+  // server will echo authoritative state; we snap then.
+}
+function round(v){ return Math.round(v*10000)/10000; }
+
+// ---- drawing ----
+function draw(){
+  if(!CW) layout();
+  ctx.clearRect(0,0,CW,CH);
+  // pockets
+  ctx.fillStyle='#04160b';
+  for(var k=0;k<6;k++){ ctx.beginPath(); ctx.arc(tx(POCKETS[k][0]),ty(POCKETS[k][1]),POCKET*SC,0,7); ctx.fill(); }
+  // balls
+  for(var i=0;i<16;i++){ var b=B[i]; if(b.pk) continue; drawBall(b); }
+  // aim guide
+  if(mode==='aim'&&aim.active){
+    var cb=cueBall();
+    ctx.strokeStyle='rgba(255,255,255,.8)'; ctx.lineWidth=Math.max(1,SC*0.004);
+    ctx.beginPath(); ctx.moveTo(tx(cb.x),ty(cb.y));
+    ctx.lineTo(tx(cb.x+aim.dx*0.5),ty(cb.y+aim.dy*0.5)); ctx.stroke();
+  }
+}
+function drawBall(b){
+  var x=tx(b.x),y=ty(b.y),r=R*SC;
+  var base = b.id===0?'#f4f4f4':(b.id===8?'#111':(b.id<8?HUE[b.id]:HUE[b.id-8]));
+  ctx.beginPath(); ctx.arc(x,y,r,0,7);
+  ctx.fillStyle = b.id>8 ? '#f4f4f4' : base; ctx.fill();
+  if(b.id>8){ // stripe band
+    ctx.save(); ctx.beginPath(); ctx.arc(x,y,r,0,7); ctx.clip();
+    ctx.fillStyle=base; ctx.fillRect(x-r,y-r*0.5,2*r,r); ctx.restore();
+  }
+  ctx.lineWidth=Math.max(1,r*0.08); ctx.strokeStyle='rgba(0,0,0,.35)'; ctx.stroke();
+  if(b.id!==0){ // number disc
+    ctx.beginPath(); ctx.arc(x,y,r*0.5,0,7); ctx.fillStyle='#fff'; ctx.fill();
+    ctx.fillStyle='#111'; ctx.font='bold '+Math.max(6,r*0.7)+'px monospace'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(String(b.id),x,y+r*0.02);
+  }
+}
+
+// ---- join wiring ----
+$('joinBtn').onclick=function(){ var n=$('nick').value.trim(); if(!n){$('msg').textContent='Enter a name';return;} if(!connected){$('joinInfo').textContent='Not connected';return;} myNick=n; send({t:'hello',nick:n}); };
+$('nick').addEventListener('keydown',function(e){ if(e.key==='Enter')$('joinBtn').click(); });
+$('rematchBtn').onclick=function(){ send({t:'rematch'}); };
+
+layout(); connect();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+Pack: Everyday
+A: Be able to fly
+B: Be invisible
+---
+A: Read minds
+B: See the future
+---
+A: Always be 10 minutes late
+B: Always be 20 minutes early
+---
+A: Have unlimited coffee
+B: Have unlimited sleep
+---

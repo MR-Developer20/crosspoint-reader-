@@ -1,0 +1,13 @@
+Pack: Classic
+Word: planet
+---
+Word: guitar
+---
+Word: window
+---
+Word: coffee
+---
+Word: rocket
+---
+Word: puzzle
+---

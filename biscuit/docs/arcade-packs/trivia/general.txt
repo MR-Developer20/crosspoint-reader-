@@ -1,0 +1,36 @@
+Pack: General Knowledge
+Q: What is the capital of France?
+A: Paris
+B: London
+C: Berlin
+D: Madrid
+Answer: A
+---
+Q: How many continents are there on Earth?
+A: 5
+B: 6
+C: 7
+D: 8
+Answer: C
+---
+Q: Which planet is known as the Red Planet?
+A: Venus
+B: Mars
+C: Jupiter
+D: Saturn
+Answer: B
+---
+Q: What is the largest ocean on Earth?
+A: Atlantic
+B: Indian
+C: Arctic
+D: Pacific
+Answer: D
+---
+Q: Who painted the Mona Lisa?
+A: Van Gogh
+B: Picasso
+C: Da Vinci
+D: Rembrandt
+Answer: C
+---

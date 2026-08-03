@@ -3,6 +3,7 @@
 #include <I18n.h>
 
 #include "AppCategoryActivity.h"
+#include "ArcadeHostActivity.h"
 #include "BleProximityActivity.h"
 #include "BleScannerActivity.h"
 #include "CasinoActivity.h"
@@ -255,6 +256,7 @@ void AppsMenuActivity::loop() {
                 {tr(STR_GAME_OF_LIFE), "Conway's cellular automaton", UIIcon::File, [](GfxRenderer& r, MappedInputManager& m) { return std::make_unique<GameOfLifeActivity>(r, m); }},
                 {tr(STR_VORONOI), "Generate Voronoi patterns", UIIcon::File, [](GfxRenderer& r, MappedInputManager& m) { return std::make_unique<VoronoiActivity>(r, m); }},
                 {"Matrix Rain", "The Matrix digital rain effect", UIIcon::File, [](GfxRenderer& r, MappedInputManager& m) { return std::make_unique<MatrixRainActivity>(r, m); }},
+                {"Arcade Host", "Host WiFi party games (Trivia + 4)", UIIcon::Hotspot, [](GfxRenderer& r, MappedInputManager& m) { return std::make_unique<ArcadeHostActivity>(r, m); }},
             };
             app = std::make_unique<AppCategoryActivity>(renderer, mappedInput, tr(STR_GAMES), std::move(e), false, 5);
             break;
@@ -470,6 +472,7 @@ void AppsMenuActivity::loop() {
               {tr(STR_GAME_OF_LIFE), "Conway's cellular automaton", UIIcon::File, [](GfxRenderer& r, MappedInputManager& m) { return std::make_unique<GameOfLifeActivity>(r, m); }},
               {tr(STR_VORONOI), "Generate Voronoi patterns", UIIcon::File, [](GfxRenderer& r, MappedInputManager& m) { return std::make_unique<VoronoiActivity>(r, m); }},
               {"Matrix Rain", "The Matrix digital rain effect", UIIcon::File, [](GfxRenderer& r, MappedInputManager& m) { return std::make_unique<MatrixRainActivity>(r, m); }},
+              {"Arcade Host", "Host WiFi party games (Trivia + 4)", UIIcon::Hotspot, [](GfxRenderer& r, MappedInputManager& m) { return std::make_unique<ArcadeHostActivity>(r, m); }},
           };
           app = std::make_unique<AppCategoryActivity>(renderer, mappedInput, tr(STR_GAMES), std::move(e), false, 5);
           break;
@@ -668,7 +671,7 @@ void AppsMenuActivity::drawTile(int index, int x, int y, int w, int h, bool sele
     case 2: name = "DEFENSE";  subtitle = "Ghost & protect";    appCount = 12; break;
     case 3: name = "COMMS";    subtitle = "Chat & share";       appCount = 5;  break;
     case 4: name = "TOOLS";    subtitle = "Utilities";          appCount = 32; break;
-    case 5: name = "GAMES";    subtitle = "Entertainment";      appCount = 11; break;
+    case 5: name = "GAMES";    subtitle = "Entertainment";      appCount = 12; break;
     case 6: name = "READER";   subtitle = "Books & OPDS";       appCount = 5;  break;
     case 7: name = "SETTINGS"; subtitle = "System & config";    appCount = 7;  break;
   }

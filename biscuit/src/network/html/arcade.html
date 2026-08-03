@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>BISCUIT ARCADE</title>
+<style>
+:root{--bg:#0a0a0a;--surf:#131313;--surf2:#1c1c1c;--fg:#e8e8e8;--dim:#8a8a8a;--acc:#FF8200;--ok:#38d66b;--bad:#ff4d4d;--cy:#3ad1e0;--bd:#2b2b2b}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:var(--bg);color:var(--fg);font-family:'Courier New',ui-monospace,Menlo,Consolas,monospace;
+ -webkit-font-smoothing:none;overflow:hidden;position:relative}
+body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:99;
+ background:repeating-linear-gradient(transparent 0 2px,rgba(0,0,0,.18) 2px 3px);opacity:.5}
+.wrap{height:100%;display:flex;flex-direction:column;max-width:520px;margin:0 auto;padding:14px}
+.bar{display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid var(--bd);padding-bottom:8px;margin-bottom:12px}
+.brand{color:var(--acc);font-weight:700;letter-spacing:3px;font-size:15px}
+.stat{color:var(--dim);font-size:11px;letter-spacing:1px}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--bad);margin-right:5px;vertical-align:middle}
+.dot.on{background:var(--ok)}
+.view{flex:1;display:none;flex-direction:column;overflow-y:auto}
+.view.on{display:flex}
+h1{font-size:13px;letter-spacing:3px;color:var(--acc);text-transform:uppercase;margin-bottom:14px}
+.lbl{font-size:11px;letter-spacing:2px;color:var(--dim);text-transform:uppercase;margin-bottom:6px}
+.card{background:var(--surf);border:2px solid var(--bd);padding:14px;margin-bottom:12px}
+input[type=text]{width:100%;background:#000;border:2px solid var(--acc);color:var(--fg);font-family:inherit;
+ font-size:18px;padding:12px;letter-spacing:2px;text-transform:uppercase}
+.cursor{display:inline-block;width:10px;height:18px;background:var(--acc);animation:bl 1s steps(1) infinite;vertical-align:middle}
+@keyframes bl{50%{opacity:0}}
+button{font-family:inherit;font-size:15px;letter-spacing:2px;text-transform:uppercase;color:var(--fg);
+ background:var(--surf2);border:2px solid var(--bd);padding:16px;cursor:pointer;width:100%;transition:none}
+button:active{transform:translateY(1px)}
+button.acc{border-color:var(--acc);color:var(--acc)}
+button.sel{background:var(--acc);border-color:var(--acc);color:#000;font-weight:700}
+button.big{font-size:20px;padding:22px}
+button:disabled{opacity:.4}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.opts{display:flex;flex-direction:column;gap:10px}
+.plist{list-style:none}
+.plist li{display:flex;justify-content:space-between;padding:9px 4px;border-bottom:1px solid var(--bd);font-size:14px}
+.rdy{color:var(--ok)}.nrdy{color:var(--dim)}
+.q{font-size:19px;line-height:1.4;margin:10px 0 16px;min-height:60px}
+.timebar{height:8px;background:var(--surf2);border:1px solid var(--bd);margin:10px 0;overflow:hidden}
+.timebar > i{display:block;height:100%;background:var(--acc);width:100%}
+.counts{display:flex;gap:6px;margin-top:8px}
+.counts > div{flex:1;text-align:center;background:var(--surf2);border:1px solid var(--bd);padding:6px;font-size:13px}
+.big-n{font-size:80px;text-align:center;color:var(--acc);font-weight:700;letter-spacing:4px}
+.mid{flex:1;display:flex;flex-direction:column;justify-content:center}
+.center{text-align:center}
+.swatch{width:140px;height:140px;margin:12px auto;border:3px solid var(--bd)}
+.slider{margin:12px 0}
+.slider label{display:flex;justify-content:space-between;font-size:12px;color:var(--dim);letter-spacing:1px}
+input[type=range]{width:100%;-webkit-appearance:none;height:26px;background:transparent}
+input[type=range]::-webkit-slider-runnable-track{height:8px;background:var(--surf2);border:1px solid var(--bd)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:24px;background:var(--acc);margin-top:-9px;border:0}
+input[type=range]::-moz-range-track{height:8px;background:var(--surf2);border:1px solid var(--bd)}
+input[type=range]::-moz-range-thumb{width:20px;height:24px;background:var(--acc);border:0;border-radius:0}
+.scores{list-style:none;margin-top:10px}
+.scores li{display:flex;justify-content:space-between;padding:7px 4px;border-bottom:1px solid var(--bd);font-size:14px}
+.scores li.me{color:var(--acc)}
+.light{height:150px;border:3px solid var(--bd);display:flex;align-items:center;justify-content:center;
+ font-size:30px;letter-spacing:4px;margin:14px 0}
+.light.wait{background:#2a1200;color:var(--acc);border-color:var(--acc)}
+.light.go{background:#04360f;color:var(--ok);border-color:var(--ok)}
+.light.dq{background:#360404;color:var(--bad);border-color:var(--bad)}
+.podium{list-style:none;margin-top:16px}
+.podium li{display:flex;justify-content:space-between;padding:14px;border:2px solid var(--bd);margin-bottom:10px;font-size:17px}
+.podium li:first-child{border-color:var(--acc);color:var(--acc)}
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#000;border:2px solid var(--acc);
+ color:var(--acc);padding:10px 18px;font-size:13px;letter-spacing:2px;z-index:100;display:none}
+.tag{font-size:11px;letter-spacing:1px;color:var(--dim)}
+.win{color:var(--ok)}.lose{color:var(--dim)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="bar">
+    <span class="brand">BISCUIT ARCADE</span>
+    <span class="stat"><span id="dot" class="dot"></span><span id="me">—</span></span>
+  </div>
+
+  <!-- JOIN -->
+  <section id="v-join" class="view on">
+    <div class="mid">
+      <h1>Enter Callsign</h1>
+      <div class="card">
+        <input id="nick" type="text" maxlength="20" placeholder="YOUR NAME" autocomplete="off" autocorrect="off" autocapitalize="characters">
+      </div>
+      <button id="joinBtn" class="acc big">Join Game</button>
+      <p class="tag center" style="margin-top:14px" id="joinInfo">Connecting to host...</p>
+    </div>
+  </section>
+
+  <!-- LOBBY -->
+  <section id="v-lobby" class="view">
+    <h1 id="lobbyGame">Lobby</h1>
+    <div class="card">
+      <div class="lbl">Players</div>
+      <ul id="players" class="plist"></ul>
+    </div>
+    <div class="mid"></div>
+    <button id="readyBtn" class="acc big">I'm Ready</button>
+    <p class="tag center" style="margin-top:12px">Host starts when everyone is ready</p>
+  </section>
+
+  <!-- COUNTDOWN -->
+  <section id="v-count" class="view">
+    <div class="mid center">
+      <div class="lbl">Starting in</div>
+      <div id="countN" class="big-n">5</div>
+    </div>
+  </section>
+
+  <!-- TRIVIA -->
+  <section id="v-trivia" class="view">
+    <div class="lbl"><span id="trRound">Q 1</span> · <span id="trTag">TRIVIA</span></div>
+    <div id="trQ" class="q"></div>
+    <div class="timebar"><i id="trTime"></i></div>
+    <div id="trOpts" class="opts"></div>
+    <div class="counts" id="trCounts" style="display:none"></div>
+    <ul id="trScores" class="scores"></ul>
+  </section>
+
+  <!-- WYR -->
+  <section id="v-wyr" class="view">
+    <div class="lbl"><span id="wyrRound">1</span> · WOULD YOU RATHER</div>
+    <div class="mid">
+      <button id="wyrA" class="acc big" style="margin-bottom:14px"></button>
+      <div class="center lbl">— or —</div>
+      <button id="wyrB" class="acc big" style="margin-top:14px"></button>
+    </div>
+    <div class="counts" id="wyrCounts"></div>
+  </section>
+
+  <!-- SCRAMBLE -->
+  <section id="v-scr" class="view">
+    <div class="lbl"><span id="scrRound">1</span> · WORD SCRAMBLE</div>
+    <div id="scrWord" class="big-n" style="font-size:44px;margin:18px 0"></div>
+    <div class="timebar"><i id="scrTime"></i></div>
+    <div class="card">
+      <input id="scrIn" type="text" maxlength="24" placeholder="UNSCRAMBLE" autocomplete="off" autocapitalize="characters">
+    </div>
+    <button id="scrBtn" class="acc">Submit</button>
+    <p id="scrMsg" class="tag center" style="margin-top:10px"></p>
+    <ul id="scrScores" class="scores"></ul>
+  </section>
+
+  <!-- REACT -->
+  <section id="v-react" class="view">
+    <div class="lbl"><span id="rcRound">1</span> · REACTION DUEL</div>
+    <div id="rcLight" class="light wait">WAIT...</div>
+    <button id="rcTap" class="acc big">TAP!</button>
+    <p id="rcMsg" class="tag center" style="margin-top:12px"></p>
+    <ul id="rcScores" class="scores"></ul>
+  </section>
+
+  <!-- GUESS COLOR -->
+  <section id="v-gc" class="view">
+    <div class="lbl"><span id="gcRound">1</span> · GUESS THE COLOR</div>
+    <div id="gcSwatch" class="swatch"></div>
+    <div class="slider"><label>R <span id="gcRv">128</span></label><input id="gcR" type="range" min="0" max="255" value="128"></div>
+    <div class="slider"><label>G <span id="gcGv">128</span></label><input id="gcG" type="range" min="0" max="255" value="128"></div>
+    <div class="slider"><label>B <span id="gcBv">128</span></label><input id="gcB" type="range" min="0" max="255" value="128"></div>
+    <div id="gcMine" class="swatch" style="width:80px;height:36px;margin:6px auto"></div>
+    <button id="gcBtn" class="acc">Lock In</button>
+    <p id="gcMsg" class="tag center" style="margin-top:10px"></p>
+    <ul id="gcScores" class="scores"></ul>
+  </section>
+
+  <!-- FINAL -->
+  <section id="v-final" class="view">
+    <h1 class="center">Final Podium</h1>
+    <ul id="board" class="podium"></ul>
+    <div class="mid"></div>
+    <p class="tag center">Waiting for the host to start the next game...</p>
+  </section>
+</div>
+<div id="toast" class="toast"></div>
+
+<script>
+(function(){
+"use strict";
+var $=function(id){return document.getElementById(id);};
+var views=['join','lobby','count','trivia','wyr','scr','react','gc','final'];
+function show(v){views.forEach(function(n){$('v-'+n).classList.toggle('on',n===v);});}
+function esc(s){return String(s==null?'':s).replace(/[<>&]/g,function(c){return c==='<'?'&lt;':c==='>'?'&gt;':'&amp;';});}
+
+var ws=null, myPid=-1, myNick='', ready=false, connected=false;
+var timer=null;
+
+function setDot(on){connected=on;$('dot').classList.toggle('on',on);}
+function toast(m){var t=$('toast');t.textContent=m;t.style.display='block';clearTimeout(t._h);t._h=setTimeout(function(){t.style.display='none';},2200);}
+
+function send(o){ if(ws&&ws.readyState===1){ ws.send(JSON.stringify(o)); } }
+
+function connect(){
+  var host=location.hostname||'192.168.4.1';
+  try{ ws=new WebSocket('ws://'+host+':81/'); }catch(e){ $('joinInfo').textContent='Connection failed'; return; }
+  ws.onopen=function(){ setDot(true); $('joinInfo').textContent='Connected. Enter a name and join.';
+    var seq=0; if(ws._hb) clearInterval(ws._hb);
+    ws._hb=setInterval(function(){ if(ws.readyState===1) send({t:'ping',n:++seq}); },15000); };
+  ws.onclose=function(){ setDot(false); $('joinInfo').textContent='Disconnected. Reload to retry.';
+    if(ws._hb){clearInterval(ws._hb);ws._hb=null;} if(timer){clearInterval(timer);timer=null;} };
+  ws.onerror=function(){ setDot(false); };
+  ws.onmessage=function(ev){ var m; try{ m=JSON.parse(ev.data); }catch(e){ return; } route(m); };
+}
+
+// ---- time bar (local dur-second countdown) ----
+function startBar(el,dur){
+  if(timer){clearInterval(timer);timer=null;}
+  if(!dur){el.style.width='100%';return;}
+  var end=Date.now()+dur*1000;
+  timer=setInterval(function(){
+    var left=end-Date.now();
+    if(left<=0){left=0;clearInterval(timer);timer=null;}
+    el.style.width=(100*left/(dur*1000))+'%';
+  },100);
+}
+function stopBar(){ if(timer){clearInterval(timer);timer=null;} }
+
+// ---- scores rendering ----
+function renderScores(ul,arr){
+  if(!arr){ul.innerHTML='';return;}
+  ul.innerHTML=arr.map(function(p){
+    return '<li class="'+(p.pid===myPid?'me':'')+'"><span>'+esc(p.nick)+'</span><span>'+p.score+'</span></li>';
+  }).join('');
+}
+
+// ---- router ----
+function route(m){
+  switch(m.t){
+    case 'welcome': myPid=m.pid; myNick=m.nick; $('me').textContent=esc(m.nick); break;
+    case 'lobby': onLobby(m); break;
+    case 'countdown': show('count'); $('countN').textContent=m.n; break;
+    case 'toast': toast(m.msg); break;
+    case 'pong': break;
+    case 'ping': send({t:'pong'}); break;
+    case 'trivia': (m.phase==='final')?onFinal(m):onTrivia(m); break;
+    case 'wyr': (m.phase==='final')?onFinal(m):onWyr(m); break;
+    case 'scramble': (m.phase==='final')?onFinal(m):onScramble(m); break;
+    case 'react': (m.phase==='final')?onFinal(m):onReact(m); break;
+    case 'gc': (m.phase==='final')?onFinal(m):onGc(m); break;
+    case 'final': onFinal(m); break;
+  }
+}
+
+// ---- lobby ----
+function onLobby(m){
+  show('lobby');
+  var g=m.game&&m.game!=='none'?m.game.toUpperCase():'LOBBY';
+  $('lobbyGame').textContent=g;
+  var me=m.players.filter(function(p){return p.pid===myPid;})[0];
+  ready=me?!!me.ready:false;
+  $('readyBtn').textContent=ready?'Ready ✓':"I'm Ready";
+  $('readyBtn').classList.toggle('sel',ready);
+  $('players').innerHTML=m.players.map(function(p){
+    return '<li><span>'+esc(p.nick)+(p.pid===myPid?' (you)':'')+'</span>'+
+      '<span class="'+(p.ready?'rdy':'nrdy')+'">'+(p.ready?'READY':'...')+'</span></li>';
+  }).join('');
+}
+
+// ---- trivia ----
+function onTrivia(m){
+  show('trivia'); stopBar();
+  $('trRound').textContent='Q '+(m.i+1)+'/'+m.total;
+  $('trQ').textContent=m.q;
+  var reveal=(m.phase==='reveal');
+  var opts=$('trOpts'); opts.innerHTML='';
+  m.o.forEach(function(txt,idx){
+    var b=document.createElement('button');
+    b.textContent=String.fromCharCode(65+idx)+'. '+txt;
+    if(reveal){
+      if(idx===m.correct) b.classList.add('sel');
+      else if(idx===m.mine) b.style.borderColor='var(--bad)';
+      b.disabled=true;
+    }else{
+      if(idx===m.mine) b.classList.add('sel');
+      b.onclick=function(){ send({t:'answer',c:idx}); };
+    }
+    opts.appendChild(b);
+  });
+  var cc=$('trCounts');
+  if(reveal&&m.counts){cc.style.display='flex';cc.innerHTML=m.counts.map(function(n,i){return '<div>'+String.fromCharCode(65+i)+': '+n+'</div>';}).join('');}
+  else cc.style.display='none';
+  if(reveal){$('trTime').style.width='0%';}else{startBar($('trTime'),m.dur);}
+  renderScores($('trScores'),m.scores);
+}
+
+// ---- wyr ----
+function onWyr(m){
+  show('wyr');
+  $('wyrRound').textContent=(m.round+1)+'/'+m.rounds;
+  var reveal=(m.phase==='reveal');
+  var a=$('wyrA'),b=$('wyrB');
+  a.textContent=m.a; b.textContent=m.b;
+  a.classList.toggle('sel',m.myvote===0); b.classList.toggle('sel',m.myvote===1);
+  a.disabled=reveal; b.disabled=reveal;
+  a.onclick=function(){ send({t:'answer',c:0}); };
+  b.onclick=function(){ send({t:'answer',c:1}); };
+  var tot=(m.counts[0]+m.counts[1])||1;
+  $('wyrCounts').innerHTML='<div>A · '+m.counts[0]+' ('+Math.round(100*m.counts[0]/tot)+'%)</div>'+
+    '<div>B · '+m.counts[1]+' ('+Math.round(100*m.counts[1]/tot)+'%)</div>';
+}
+
+// ---- scramble ----
+function onScramble(m){
+  show('scr'); stopBar();
+  $('scrRound').textContent=(m.round+1)+'/'+m.rounds;
+  $('scrWord').textContent=(m.scram||'').toUpperCase();
+  var reveal=(m.phase==='reveal');
+  $('scrIn').disabled=reveal||m.solved;
+  $('scrBtn').disabled=reveal||m.solved;
+  if(reveal){ $('scrTime').style.width='0%'; $('scrMsg').innerHTML='Answer: <b class="win">'+esc((m.word||'').toUpperCase())+'</b>'; }
+  else if(m.solved){ $('scrMsg').innerHTML='<span class="win">Solved!</span>'; startBar($('scrTime'),m.dur); }
+  else { $('scrMsg').textContent=m.len+' letters'; startBar($('scrTime'),m.dur); }
+  renderScores($('scrScores'),m.scores);
+}
+
+// ---- react ----
+function onReact(m){
+  show('react');
+  $('rcRound').textContent=(m.round+1)+'/'+m.rounds;
+  var reveal=(m.phase==='reveal');
+  var iDq=(m.dq||[]).indexOf(myNick)>=0;
+  var light=$('rcLight');
+  var tap=$('rcTap');
+  if(reveal){
+    light.className='light'+(m.iwon?' go':'');
+    light.textContent=m.winner?('WON: '+m.winner):'NO WINNER';
+    $('rcMsg').innerHTML=m.winner?('Fastest: <b>'+esc(m.winner)+'</b> · '+m.ms+'ms'+(m.iwon?' <span class="win">— that\'s you!</span>':'')):'Nobody tapped in time';
+    tap.disabled=true;
+  }else{
+    if(iDq){ light.className='light dq'; light.textContent='TOO SOON!'; tap.disabled=true; $('rcMsg').textContent='DQ for this round'; }
+    else if(m.light==='go'){ light.className='light go'; light.textContent='TAP NOW!'; tap.disabled=false; $('rcMsg').textContent=''; }
+    else { light.className='light wait'; light.textContent='WAIT...'; tap.disabled=false; $('rcMsg').textContent="Don't tap early!"; }
+  }
+  tap.onclick=function(){ send({t:'tap'}); };
+  renderScores($('rcScores'),m.scores);
+}
+
+// ---- guess color ----
+var gcSubmitted=false;
+function gcUpdateMine(){
+  var r=+$('gcR').value,g=+$('gcG').value,b=+$('gcB').value;
+  $('gcRv').textContent=r;$('gcGv').textContent=g;$('gcBv').textContent=b;
+  $('gcMine').style.background='rgb('+r+','+g+','+b+')';
+}
+['gcR','gcG','gcB'].forEach(function(id){ $(id).addEventListener('input',gcUpdateMine); });
+function onGc(m){
+  show('gc');
+  $('gcRound').textContent=(m.round+1)+'/'+m.rounds;
+  var reveal=(m.phase==='reveal');
+  $('gcSwatch').style.background=m.color;
+  var dis=reveal||m.submitted;
+  $('gcR').disabled=dis;$('gcG').disabled=dis;$('gcB').disabled=dis;$('gcBtn').disabled=dis;
+  if(reveal){
+    if(m.your){ $('gcMsg').innerHTML='True '+esc(m.color)+' · your '+esc(m.your.color)+' · dist '+m.your.dist+' · <b class="win">'+m.your.points+' pts</b>'; }
+    else { $('gcMsg').textContent='No guess submitted'; }
+    if(m.winner) $('gcMsg').innerHTML+=' · winner '+esc(m.winner)+(m.iwon?' (you!)':'');
+  }else if(m.submitted){ $('gcMsg').innerHTML='<span class="win">Locked in — waiting...</span>'; }
+  else{ $('gcMsg').textContent='Match the swatch, then lock in'; }
+  gcUpdateMine();
+  renderScores($('gcScores'),m.scores);
+}
+
+// ---- final ----
+function onFinal(m){
+  show('final'); stopBar(); gcSubmitted=false;
+  var b=m.board||[];
+  $('board').innerHTML=b.map(function(p,i){
+    return '<li><span>'+(i+1)+'. '+esc(p.nick)+(p.pid===myPid?' (you)':'')+'</span><span>'+p.score+'</span></li>';
+  }).join('');
+}
+
+// ---- input wiring ----
+$('joinBtn').onclick=function(){
+  var n=$('nick').value.trim();
+  if(!n){ toast('Enter a name'); return; }
+  if(!connected){ toast('Not connected'); return; }
+  myNick=n; send({t:'hello',nick:n});
+};
+$('nick').addEventListener('keydown',function(e){ if(e.key==='Enter') $('joinBtn').click(); });
+$('readyBtn').onclick=function(){ ready=!ready; send({t:'ready',ready:ready}); };
+$('scrBtn').onclick=function(){ var v=$('scrIn').value.trim(); if(v){ send({t:'guess',text:v}); } };
+$('scrIn').addEventListener('keydown',function(e){ if(e.key==='Enter') $('scrBtn').click(); });
+$('gcBtn').onclick=function(){ send({t:'guess',r:+$('gcR').value,g:+$('gcG').value,b:+$('gcB').value}); };
+
+connect();
+})();
+</script>
+</body>
+</html>

@@ -8,6 +8,8 @@
 #include <Logging.h>
 #include <esp_ota_ops.h>
 
+#include <cstdio>
+
 #include "MappedInputManager.h"
 #include "activities/home/FileBrowserActivity.h"
 #include "activities/util/ConfirmationActivity.h"
@@ -63,7 +65,32 @@ void SdFirmwareUpdateActivity::onPickerResult(const ActivityResult& result) {
     return;
   }
 
-  promptConfirmation();
+  showSlotSelector();
+}
+
+void SdFirmwareUpdateActivity::showSlotSelector() {
+  // Capture the slot facts once, here, so render() stays free of flash reads.
+  // The destination is always the passive slot: the running slot cannot be
+  // rewritten while executing from it.
+  boot_switch::PassiveSlotInfo info = {};
+  const bool targetOccupied = boot_switch::peekPassiveSlot(info);
+
+  boot_switch::runningSlotLabel(runningSlotName, sizeof(runningSlotName));
+  snprintf(targetSlotLabel, sizeof(targetSlotLabel), "%s", info.label);
+  if (targetOccupied) {
+    boot_switch::describeSlot(info, targetSlotDesc, sizeof(targetSlotDesc));
+  } else {
+    snprintf(targetSlotDesc, sizeof(targetSlotDesc), "%s", tr(STR_SLOT_EMPTY));
+  }
+
+  // Default to the familiar behaviour (boot the firmware just installed).
+  slotChoiceIndex = 0;
+
+  {
+    RenderLock lock(*this);
+    state = State::SELECTING_SLOT;
+  }
+  requestUpdate();
 }
 
 bool SdFirmwareUpdateActivity::validateFirmware() {
@@ -130,42 +157,11 @@ void SdFirmwareUpdateActivity::promptConfirmation() {
 
 void SdFirmwareUpdateActivity::onConfirmationResult(const ActivityResult& result) {
   if (result.isCancelled) {
-    if (recoveryMode) {
-      // Go back to the picker rather than exiting recovery.
-      launchPicker();
-      return;
-    }
-    finish();
-    return;
-  }
-
-  promptOverwriteWarning();
-}
-
-void SdFirmwareUpdateActivity::promptOverwriteWarning() {
-  // Dual-OS guard: the flasher writes the passive slot, so a bootable image
-  // there (e.g. the other OS) is destroyed by this update. A blank slot means
-  // no extra prompt — the common single-OS path is unchanged.
-  boot_switch::PassiveSlotInfo info = {};
-  if (!boot_switch::peekPassiveSlot(info)) {
-    startUpdate();
-    return;
-  }
-
-  char body[64];
-  boot_switch::describeSlot(info, body, sizeof(body));
-  startActivityForResult(std::make_unique<ConfirmationActivity>(renderer, mappedInput,
-                                                                tr(STR_OVERWRITE_OTHER_OS_PROMPT), std::string(body)),
-                         [this](const ActivityResult& result) { onOverwriteWarningResult(result); });
-}
-
-void SdFirmwareUpdateActivity::onOverwriteWarningResult(const ActivityResult& result) {
-  if (result.isCancelled) {
-    if (recoveryMode) {
-      launchPicker();
-      return;
-    }
-    finish();
+    // Back out to the slot selector rather than the picker: the user has
+    // already chosen a file, so re-picking it would be busywork.
+    RenderLock lock(*this);
+    state = State::SELECTING_SLOT;
+    requestUpdate();
     return;
   }
 
@@ -199,12 +195,24 @@ void SdFirmwareUpdateActivity::performUpdate() {
   // pre-confirmation pass. The alreadyValidated parameter on the API stays
   // for callers (e.g. an OTA staging path) where the same byte stream was
   // just hashed and there's no removable-media gap.
-  const auto result = firmware_flash::flashFromSdPath(firmwarePath.c_str(), progressCb, this);
+  const bool bootIntoNew = bootIntoNewFirmware();
+  const auto result = firmware_flash::flashFromSdPath(firmwarePath.c_str(), progressCb, this,
+                                                      /*alreadyValidated=*/false, /*switchBootPartition=*/bootIntoNew);
   if (result != firmware_flash::Result::OK) {
     LOG_ERR("FW", "flash failed: %s", firmware_flash::resultName(result));
     errorMessage = tr(STR_FIRMWARE_WRITE_FAILED);
     RenderLock lock(*this);
     state = State::FAILED;
+    requestUpdate();
+    return;
+  }
+
+  if (!bootIntoNew) {
+    // Installed into the passive slot with otadata untouched: nothing to
+    // reboot into, so report and let the user carry on in the current OS.
+    LOG_INF("FW", "SD firmware installed to %s, staying on %s", targetSlotLabel, runningSlotName);
+    RenderLock lock(*this);
+    state = State::INSTALLED;
     requestUpdate();
     return;
   }
@@ -220,6 +228,44 @@ void SdFirmwareUpdateActivity::performUpdate() {
 }
 
 void SdFirmwareUpdateActivity::loop() {
+  if (state == State::SELECTING_SLOT) {
+    if (mappedInput.wasPressed(MappedInputManager::Button::Up) ||
+        mappedInput.wasPressed(MappedInputManager::Button::Down)) {
+      {
+        RenderLock lock(*this);
+        slotChoiceIndex = (slotChoiceIndex + 1) % slotChoiceCount;
+      }
+      requestUpdate();
+      return;
+    }
+    if (mappedInput.wasPressed(MappedInputManager::Button::Confirm)) {
+      promptConfirmation();
+      return;
+    }
+    if (mappedInput.wasPressed(MappedInputManager::Button::Back)) {
+      if (recoveryMode) {
+        state = State::PICKING;
+        launchPicker();
+        return;
+      }
+      finish();
+    }
+    return;
+  }
+
+  if (state == State::INSTALLED) {
+    if (mappedInput.wasPressed(MappedInputManager::Button::Back) ||
+        mappedInput.wasPressed(MappedInputManager::Button::Confirm)) {
+      if (recoveryMode) {
+        state = State::PICKING;
+        launchPicker();
+        return;
+      }
+      finish();
+    }
+    return;
+  }
+
   if (state == State::FAILED) {
     if (mappedInput.wasPressed(MappedInputManager::Button::Back) ||
         mappedInput.wasPressed(MappedInputManager::Button::Confirm)) {
@@ -269,9 +315,47 @@ void SdFirmwareUpdateActivity::render(RenderLock&&) {
     // so the do-not-power-off line below stays at the same Y as before.
     y += lineHeight + metrics.verticalSpacing;
     renderer.drawCenteredText(UI_10_FONT_ID, y, tr(STR_FIRMWARE_UPDATE_DO_NOT_POWER_OFF));
+  } else if (state == State::SELECTING_SLOT) {
+    // Slot facts, then the two outcomes. The write target is fixed (the passive
+    // slot); what the user picks is whether to boot into it afterwards.
+    const int rowStep = lineHeight + metrics.verticalSpacing;
+    int y = metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing * 2;
+
+    char line[96];
+    snprintf(line, sizeof(line), "%s%s", tr(STR_SLOT_TARGET_PREFIX), targetSlotLabel);
+    renderer.drawText(UI_10_FONT_ID, metrics.contentSidePadding, y, line, true, EpdFontFamily::BOLD);
+    y += rowStep;
+
+    snprintf(line, sizeof(line), "%s%s", tr(STR_SLOT_CONTAINS_PREFIX), targetSlotDesc);
+    renderer.drawText(UI_10_FONT_ID, metrics.contentSidePadding, y, line);
+    y += rowStep;
+
+    snprintf(line, sizeof(line), "%s%s", tr(STR_SLOT_RUNNING_PREFIX), runningSlotName);
+    renderer.drawText(UI_10_FONT_ID, metrics.contentSidePadding, y, line);
+    y += rowStep * 2;
+
+    static constexpr StrId choiceIds[slotChoiceCount] = {StrId::STR_INSTALL_AND_BOOT, StrId::STR_INSTALL_ONLY};
+    for (int i = 0; i < slotChoiceCount; ++i) {
+      const bool selected = (i == slotChoiceIndex);
+      snprintf(line, sizeof(line), "%s %s", selected ? ">" : " ", I18N.get(choiceIds[i]));
+      renderer.drawText(UI_10_FONT_ID, metrics.contentSidePadding, y, line, true,
+                        selected ? EpdFontFamily::BOLD : EpdFontFamily::REGULAR);
+      y += rowStep;
+    }
+
+    const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_SELECT), "", "");
+    GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
   } else if (state == State::SUCCESS) {
     renderer.drawCenteredText(UI_10_FONT_ID, top, tr(STR_UPDATE_COMPLETE), true, EpdFontFamily::BOLD);
     renderer.drawCenteredText(UI_10_FONT_ID, top + lineHeight + metrics.verticalSpacing, tr(STR_RESTARTING_HINT));
+  } else if (state == State::INSTALLED) {
+    char line[96];
+    snprintf(line, sizeof(line), "%s%s", tr(STR_FIRMWARE_INSTALLED_TO), targetSlotLabel);
+    renderer.drawCenteredText(UI_10_FONT_ID, top, line, true, EpdFontFamily::BOLD);
+    renderer.drawCenteredText(UI_10_FONT_ID, top + lineHeight + metrics.verticalSpacing,
+                              tr(STR_SWITCH_OS_TO_BOOT_HINT));
+    const auto labels = mappedInput.mapLabels(tr(STR_BACK), "", "", "");
+    GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
   } else if (state == State::FAILED) {
     renderer.drawCenteredText(UI_10_FONT_ID, top, tr(STR_UPDATE_FAILED), true, EpdFontFamily::BOLD);
     if (!errorMessage.empty()) {

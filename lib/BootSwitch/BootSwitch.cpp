@@ -87,6 +87,19 @@ bool swapToPassive() {
   return ota_boot::switchTo(passive);
 }
 
+void runningSlotLabel(char* out, size_t outLen) {
+  if (!out || outLen == 0) return;
+  out[0] = '\0';
+
+  const esp_partition_t* running = esp_ota_get_running_partition();
+  if (!running) {
+    BOOTSWITCH_LOG_ERR("BOOT", "running partition not found");
+    return;
+  }
+  strncpy(out, running->label, outLen - 1);
+  out[outLen - 1] = '\0';
+}
+
 void describeSlot(const PassiveSlotInfo& info, char* out, size_t outLen) {
   if (info.version[0] != '\0') {
     snprintf(out, outLen, "%s: %s", info.label, info.version);

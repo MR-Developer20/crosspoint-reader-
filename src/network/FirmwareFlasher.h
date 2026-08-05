@@ -45,7 +45,13 @@ using ProgressCb = void (*)(size_t written, size_t total, void* ctx);
 // the user the confirmation prompt) skip the redundant second pass. Defaults
 // to false so callers without prior validation (any future entry point) keep
 // the defense-in-depth check.
-Result flashFromSdPath(const char* sdPath, ProgressCb onProgress, void* ctx, bool alreadyValidated = false);
+//
+// `switchBootPartition` controls the final otadata write. Pass false to install
+// into the passive slot without making it the boot target — the dual-OS case
+// where you update the *other* OS and keep running the current one. The image
+// is still fully written and verified; only the boot pointer is left alone.
+Result flashFromSdPath(const char* sdPath, ProgressCb onProgress, void* ctx, bool alreadyValidated = false,
+                       bool switchBootPartition = true);
 
 // Full-image integrity check that mirrors the bootloader's verification:
 // header magic, segment table walk, XOR checksum, and SHA256 trailer (when

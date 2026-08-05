@@ -35,4 +35,8 @@ bool swapToPassive();
 // passive slot.
 void describeSlot(const PassiveSlotInfo& info, char* out, size_t outLen);
 
+// Partition label of the slot this firmware is executing from (e.g. "app0").
+// Writes an empty string when the running partition cannot be resolved.
+void runningSlotLabel(char* out, size_t outLen);
+
 }  // namespace boot_switch

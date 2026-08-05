@@ -224,7 +224,8 @@ Result validateImageFile(const char* sdPath, size_t partitionSize) {
   return Result::OK;
 }
 
-Result flashFromSdPath(const char* sdPath, ProgressCb onProgress, void* ctx, bool alreadyValidated) {
+Result flashFromSdPath(const char* sdPath, ProgressCb onProgress, void* ctx, bool alreadyValidated,
+                       bool switchBootPartition) {
   // Resolve destination first so we can size-check during validation. The full image-integrity
   // pass below verifies header, segment table, XOR checksum and SHA256 trailer end-to-end before
   // we touch otadata, so a truncated/corrupted .bin can never become the next boot target.
@@ -298,6 +299,13 @@ Result flashFromSdPath(const char* sdPath, ProgressCb onProgress, void* ctx, boo
     delay(1);
   }
   file.close();
+
+  if (!switchBootPartition) {
+    // Dual-OS install-only: the image is in place but otadata still points at
+    // the running slot, so the next boot stays on the current firmware.
+    LOG_INF("FLASH", "wrote %s without switching boot partition", dest->label);
+    return Result::OK;
+  }
 
   if (!ota_boot::switchTo(dest)) {
     LOG_ERR("FLASH", "otadata switch failed");

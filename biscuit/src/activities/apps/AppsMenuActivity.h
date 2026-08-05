@@ -41,6 +41,11 @@ class AppsMenuActivity final : public Activity {
 
   void refreshSystemInfo();
 
+  // Builds the category submenu for a selector index. Shared by both Confirm
+  // handlers (grid + list views) so the ~100-app catalog is instantiated once
+  // instead of duplicated across two switch statements.
+  std::unique_ptr<Activity> createCategoryActivity(int selectorIndex);
+
   // Last-used activity per category (read from SD on enter)
   char lastUsedName[ITEM_COUNT][32] = {};
   void loadLastUsed();

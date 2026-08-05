@@ -8,6 +8,7 @@
 
 #include "PartyGame.h"
 
+ArcadeSession::ArcadeSession() = default;
 ArcadeSession::~ArcadeSession() = default;
 
 void ArcadeSession::reset() {

@@ -38,8 +38,11 @@ class ArcadeSession {
     bool ready = false;
   };
 
-  ArcadeSession() = default;
-  ~ArcadeSession();  // defined in .cpp where PartyGame is complete (unique_ptr member)
+  // Both defined in the .cpp where PartyGame is complete — the unique_ptr<PartyGame>
+  // member otherwise forces its deleter to instantiate against an incomplete type
+  // in every TU that constructs/destroys an ArcadeSession (e.g. AppsMenuActivity).
+  ArcadeSession();
+  ~ArcadeSession();
 
   void begin(WebSocketsServer* ws) { wsServer = ws; reset(); }
   void reset();

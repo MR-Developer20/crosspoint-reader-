@@ -17,7 +17,7 @@ class TriviaGame final : public PartyGame {
 
   // Load the pack up-front; host checks the return before starting the game.
   bool load(const std::string& path);
-  const char* packTitle() const { return title; }
+  const char* packTitle() const { return packName; }
 
   const char* id() const override { return "trivia"; }
   int roundCount() const override { return static_cast<int>(questions.size()); }
@@ -34,7 +34,7 @@ class TriviaGame final : public PartyGame {
 
  private:
   std::vector<PackLoader::TriviaQ> questions;
-  char title[48] = {0};
+  char packName[48] = {0};
 
   int8_t choice[ArcadeSession::MAX_CLIENTS];
   uint32_t answerMs[ArcadeSession::MAX_CLIENTS];

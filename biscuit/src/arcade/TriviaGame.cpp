@@ -6,7 +6,7 @@
 #include <cstring>
 
 bool TriviaGame::load(const std::string& path) {
-  return PackLoader::loadTrivia(path, questions, QUESTION_CAP, title, sizeof(title));
+  return PackLoader::loadTrivia(path, questions, QUESTION_CAP, packName, sizeof(packName));
 }
 
 void TriviaGame::onRoundStart(int round) {

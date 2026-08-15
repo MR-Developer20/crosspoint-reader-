@@ -1,6 +1,7 @@
 # File Formats
 
-These formats describe the SD-card cache files under `/.crosspoint/epub_<hash>/`.
+These formats describe the SD-card cache files under `/.crosspoint/epub_<hash>/`
+(and, for `.md` files, `/.crosspoint/md_<hash>/` — see "Markdown cache" below).
 All POD fields are written in the ESP32 little-endian representation used by
 `Serialization.h`; strings are length-prefixed UTF-8.
 
@@ -318,3 +319,70 @@ if (parsedSize != fileSize) {
     std::warning(std::format("Unparsed data detected: {} bytes remaining at offset 0x{:X}", fileSize - parsedSize, parsedSize));
 }
 ```
+
+## Markdown cache
+
+`.md` files are converted once into a synthetic EPUB and rendered through the
+same engine as real EPUBs (`lib/Markdown/`), rather than through a second
+layout path — see `lib/Markdown/Markdown.h` for the rationale. This produces
+two cache directories per book, not one:
+
+- `/.crosspoint/md_<hash(mdPath)>/` — the `.md` file's own cache, holding the
+  generated `book.epub` and `source.meta` below.
+- `/.crosspoint/epub_<hash(epubPath)>/` — the *wrapping* `Epub`'s own cache
+  (`book.bin`, `sections/*.bin`, exactly as for a real EPUB), keyed by the
+  hash of `book.epub`'s path, since `Epub`'s cache key is always a hash of
+  the path it was opened with.
+
+`book.epub` keeps a fixed filename across regenerations (so the `.md`'s own
+cache directory doesn't grow unbounded), but `Epub`'s own cache validation
+only checks a format-version byte — it never inspects the source zip's
+content (true for any EPUB, not just a generated one). So every time
+`Markdown::convertToEpub()` regenerates `book.epub`, it explicitly purges the
+wrapping `Epub`'s cache directory first (`Epub(epubPath, cacheBasePath).clearCache()`),
+otherwise a reader opening the file next would silently reuse stale
+`book.bin`/`sections/*.bin` from the previous version of the content.
+
+### `source.meta`
+
+9 bytes, no ImHex pattern needed — three flat fields, magic first:
+
+| Offset | Type | Field |
+|---|---|---|
+| 0 | `u32` | magic `0x4D444D31` ("MDM1") |
+| 4 | `u8` | version (currently 1) |
+| 5 | `u32` | source `.md` file size, in bytes |
+
+Staleness check (`Markdown::isCacheFresh()`): the cached `book.epub` is reused
+only if `source.meta` exists, its magic/version match, **and** the `.md`
+file's current size equals the stored size. This mirrors
+`TxtReaderActivity`'s own cache validation, which is also size-only — the HAL
+exposes no file modification time, so a same-byte-count edit is not detected
+(same accepted limitation as the TXT cache; clearing `/.crosspoint/` forces a
+rebuild regardless).
+
+### `book.epub`
+
+A minimal, uncompressed (STORED-only) EPUB, written with
+`lib/Markdown/StoredZipWriter.h` since miniz's archive-writing APIs are
+compiled out on this target (see `lib/miniz/src/MinizConfig.h`) and no
+compression is needed for already-small source text. Layout:
+
+```
+mimetype                  — "application/epub+zip", first entry, no compression
+META-INF/container.xml    — points to OEBPS/content.opf
+OEBPS/content.opf         — metadata, manifest, single-item spine
+OEBPS/toc.ncx             — one flat navPoint per heading (see below)
+OEBPS/style.css           — heading/list/blockquote/code spacing (lib/Markdown/Markdown.cpp)
+OEBPS/index.xhtml         — the converted document (lib/Markdown/MarkdownToXhtml.h)
+OEBPS/images/imgN.ext     — locally-embeddable images referenced by the document, if any
+```
+
+The whole document is a **single spine item** — there is no per-chapter file
+splitting. Chapter navigation instead uses `Section`'s existing
+anchor-to-page mechanism: every heading in `index.xhtml` gets `id="hN"`
+(N = document order), and `toc.ncx` points each navPoint at
+`index.xhtml#hN`. `toc.ncx`'s navPoints are siblings regardless of heading
+level (h1-h6) — flattening avoids a stack-based generator for closing/opening
+nested `<navPoint>` tags, at the cost of losing heading-level indentation in
+the "Select Chapter" list; every heading is still independently navigable.

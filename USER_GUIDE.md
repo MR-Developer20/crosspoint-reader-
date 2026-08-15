@@ -533,6 +533,37 @@ See [docs/sd-card-fonts.md](./docs/sd-card-fonts.md) for full installation detai
 
 Once you have opened a book, the button layout changes to facilitate reading.
 
+### Supported Formats
+
+CrossPoint reads **EPUB**, **XTC**, **JWPUB**, **TXT**, and **Markdown**
+(`.md`) files directly from the Browse Files screen.
+
+Markdown files are rendered with real formatting — headings, **bold**,
+_italic_, lists, blockquotes, code blocks, horizontal rules, and local
+images — the same way an EPUB is, including chapter navigation for a
+document's headings. Supported Markdown is a practical subset of
+[CommonMark](https://commonmark.org/), covering everything most Markdown
+documents use:
+
+* ATX headings (`# Heading` through `###### Heading`) — not the underline
+  style (`Heading\n=====`)
+* **Bold**, _italic_, and `code spans` (must open and close on the same
+  source line)
+* Ordered and unordered lists, nested up to 4 levels deep
+* Blockquotes, nested up to 4 levels deep
+* Fenced (` ``` `) and indented code blocks
+* Horizontal rules (`---`)
+* `![alt](image.jpg)` for a local JPEG/PNG next to the `.md` file — remote
+  URLs aren't fetched, and `[text](url)` links show their text only, since
+  there's no browser to follow them
+* Reference-style links, tables, and raw HTML inside the Markdown are not
+  supported and render as plain text
+
+The first time a `.md` file is opened, CrossPoint converts it in the
+background (shown as "Indexing…", the same popup EPUBs use on first open);
+reopening it afterward is instant. Editing the file and reinserting the SD
+card triggers a fresh conversion automatically.
+
 ### Page Turning
 
 | Action            | Buttons                              |

@@ -66,6 +66,9 @@ inline bool hasTxtExtension(const String& fileName) {
 
 // Check for .md extension (case-insensitive)
 bool hasMarkdownExtension(std::string_view fileName);
+inline bool hasMarkdownExtension(const String& fileName) {
+  return hasMarkdownExtension(std::string_view{fileName.c_str(), fileName.length()});
+}
 
 // Check for .css extension (case-insensitive)
 bool hasCssExtension(std::string_view fileName);

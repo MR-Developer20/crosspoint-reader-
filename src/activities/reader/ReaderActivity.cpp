@@ -11,6 +11,7 @@
 #include "Epub.h"
 #include "EpubReaderActivity.h"
 #include "Jwpub.h"
+#include "Markdown.h"
 #include "SdCardFontSystem.h"
 #include "Txt.h"
 #include "TxtReaderActivity.h"
@@ -22,14 +23,13 @@
 
 bool ReaderActivity::isXtcFile(const std::string& path) { return FsHelpers::hasXtcExtension(path); }
 
-bool ReaderActivity::isTxtFile(const std::string& path) {
-  return FsHelpers::hasTxtExtension(path) ||
-         FsHelpers::hasMarkdownExtension(path);  // Treat .md as txt files (until we have a markdown reader)
-}
+bool ReaderActivity::isTxtFile(const std::string& path) { return FsHelpers::hasTxtExtension(path); }
 
 bool ReaderActivity::isBmpFile(const std::string& path) { return FsHelpers::hasBmpExtension(path); }
 
 bool ReaderActivity::isJwpubFile(const std::string& path) { return FsHelpers::hasJwpubExtension(path); }
+
+bool ReaderActivity::isMarkdownFile(const std::string& path) { return FsHelpers::hasMarkdownExtension(path); }
 
 std::unique_ptr<Epub> ReaderActivity::loadEpub(const std::string& path) {
   if (!Storage.exists(path.c_str())) {
@@ -110,6 +110,50 @@ std::unique_ptr<Txt> ReaderActivity::loadJwpub(const std::string& path) {
   return nullptr;
 }
 
+std::unique_ptr<Epub> ReaderActivity::loadMarkdown(const std::string& path) {
+  if (!Storage.exists(path.c_str())) {
+    LOG_ERR("READER", "File does not exist: %s", path.c_str());
+    return nullptr;
+  }
+
+  auto markdown = makeUniqueNoThrow<Markdown>(path, "/.crosspoint");
+  if (!markdown) {
+    LOG_ERR("READER", "Failed to allocate Markdown object");
+    return nullptr;
+  }
+  // First open: converting to a synthetic EPUB takes a moment. Show the indexing popup (as
+  // EPUB/JWPUB do); a cached, up-to-date open reuses book.epub in a blink.
+  const bool uncached = !Storage.exists(markdown->getEpubPath().c_str());
+  if (uncached) {
+    GUI.drawPopup(renderer, tr(STR_INDEXING));
+  }
+  bool loaded;
+  {
+    // Lend the framebuffer's 48 KB to the conversion (mirrors loadJwpub/loadEpub above).
+    std::optional<GfxRenderer::FrameBufferLoan> loan;
+    if (uncached) loan.emplace(renderer);
+    loaded = markdown->load();
+  }
+  if (!loaded) {
+    LOG_ERR("READER", "Failed to load Markdown");
+    return nullptr;
+  }
+
+  // Render the generated synthetic EPUB through the EPUB reader, keeping the .md path as the
+  // navigation identity so "back" returns to the book's folder rather than the cache.
+  auto epub = makeUniqueNoThrow<Epub>(markdown->getEpubPath(), "/.crosspoint", path);
+  if (!epub) {
+    LOG_ERR("READER", "Failed to allocate EPUB wrapper for Markdown");
+    return nullptr;
+  }
+  if (epub->load(true, SETTINGS.embeddedStyle == 0)) {
+    return epub;
+  }
+
+  LOG_ERR("READER", "Failed to load generated book.epub");
+  return nullptr;
+}
+
 std::unique_ptr<Xtc> ReaderActivity::loadXtc(const std::string& path) {
   if (!Storage.exists(path.c_str())) {
     LOG_ERR("READER", "File does not exist: %s", path.c_str());
@@ -155,7 +199,7 @@ void ReaderActivity::goToLibrary(const std::string& fromBookPath) {
 }
 
 void ReaderActivity::onGoToEpubReader(std::unique_ptr<Epub> epub) {
-  const auto epubPath = epub->getPath();
+  const auto epubPath = epub->getBookPath();
   currentBookPath = epubPath;
   activityManager.replaceActivity(std::make_unique<EpubReaderActivity>(renderer, mappedInput, std::move(epub)));
 }
@@ -210,6 +254,13 @@ void ReaderActivity::onEnter() {
       return;
     }
     onGoToTxtReader(std::move(txt));
+  } else if (isMarkdownFile(initialBookPath)) {
+    auto epub = loadMarkdown(initialBookPath);
+    if (!epub) {
+      onGoBack();
+      return;
+    }
+    onGoToEpubReader(std::move(epub));
   } else {
     auto epub = loadEpub(initialBookPath);
     if (!epub) {

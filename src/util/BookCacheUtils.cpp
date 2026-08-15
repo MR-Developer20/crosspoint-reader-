@@ -4,6 +4,7 @@
 #include <FsHelpers.h>
 #include <Jwpub.h>
 #include <Logging.h>
+#include <Markdown.h>
 #include <Txt.h>
 #include <Xtc.h>
 
@@ -16,11 +17,13 @@ bool isBookCacheDirectoryName(const char* name) {
   constexpr char TXT_PREFIX[] = "txt_";
   constexpr char XTC_PREFIX[] = "xtc_";
   constexpr char JWPUB_PREFIX[] = "jwpub_";
+  constexpr char MD_PREFIX[] = "md_";
 
   return strncmp(name, EPUB_PREFIX, std::size(EPUB_PREFIX) - 1) == 0 ||
          strncmp(name, TXT_PREFIX, std::size(TXT_PREFIX) - 1) == 0 ||
          strncmp(name, XTC_PREFIX, std::size(XTC_PREFIX) - 1) == 0 ||
-         strncmp(name, JWPUB_PREFIX, std::size(JWPUB_PREFIX) - 1) == 0;
+         strncmp(name, JWPUB_PREFIX, std::size(JWPUB_PREFIX) - 1) == 0 ||
+         strncmp(name, MD_PREFIX, std::size(MD_PREFIX) - 1) == 0;
 }
 
 void clearBookCache(const std::string& path) {
@@ -32,6 +35,13 @@ void clearBookCache(const std::string& path) {
     Txt(path, "/.crosspoint").clearCache();
   } else if (FsHelpers::hasJwpubExtension(path)) {
     Jwpub(path, "/.crosspoint").clearCache();
+  } else if (FsHelpers::hasMarkdownExtension(path)) {
+    // Two cache dirs: md_<hash> (the .md's own cache, holding the generated book.epub) and
+    // the wrapping Epub's own epub_<hash-of-book.epub-path> cache (book.bin/sections/*) —
+    // a sibling directory under /.crosspoint, not nested under md_<hash>. Both need clearing.
+    Markdown markdown(path, "/.crosspoint");
+    Epub(markdown.getEpubPath(), "/.crosspoint").clearCache();
+    markdown.clearCache();
   } else {
     return;
   }

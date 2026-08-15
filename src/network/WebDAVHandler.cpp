@@ -802,6 +802,7 @@ String WebDAVHandler::getMimeType(const String& path) const {
   if (FsHelpers::hasEpubExtension(path)) return "application/epub+zip";
   if (FsHelpers::checkFileExtension(path, ".pdf")) return "application/pdf";
   if (FsHelpers::hasTxtExtension(path)) return "text/plain";
+  if (FsHelpers::hasMarkdownExtension(path)) return "text/markdown";
   if (FsHelpers::checkFileExtension(path, ".html") || FsHelpers::checkFileExtension(path, ".htm")) return "text/html";
   if (FsHelpers::checkFileExtension(path, ".css")) return "text/css";
   if (FsHelpers::checkFileExtension(path, ".js")) return "application/javascript";

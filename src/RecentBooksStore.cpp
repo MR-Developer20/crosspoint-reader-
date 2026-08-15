@@ -4,6 +4,7 @@
 #include <FsHelpers.h>
 #include <HalStorage.h>
 #include <Logging.h>
+#include <Markdown.h>
 #include <Xtc.h>
 
 #include <algorithm>
@@ -133,7 +134,21 @@ RecentBook RecentBooksStore::getDataFromBook(std::string path) const {
     if (xtc.load()) {
       return RecentBook{path, xtc.getTitle(), xtc.getAuthor(), xtc.getThumbBmpPath()};
     }
-  } else if (FsHelpers::hasTxtExtension(lastBookFileName) || FsHelpers::hasMarkdownExtension(lastBookFileName)) {
+  } else if (FsHelpers::hasMarkdownExtension(lastBookFileName)) {
+    // Only use the cached synthetic EPUB if one already exists — mirrors the "avoid heavy
+    // loading on boot" rationale above: a never-opened .md just shows its filename, same as
+    // it would have before Markdown support existed. Converting on every boot scan would
+    // undo that.
+    Markdown markdown(path, "/.crosspoint");
+    if (Storage.exists(markdown.getEpubPath().c_str())) {
+      Epub epub(markdown.getEpubPath(), "/.crosspoint", path);
+      epub.load(false, true);
+      if (!epub.getTitle().empty()) {
+        return RecentBook{path, epub.getTitle(), epub.getAuthor(), epub.getThumbBmpPath()};
+      }
+    }
+    return RecentBook{path, lastBookFileName, "", ""};
+  } else if (FsHelpers::hasTxtExtension(lastBookFileName)) {
     return RecentBook{path, lastBookFileName, "", ""};
   }
   return RecentBook{path, "", "", ""};

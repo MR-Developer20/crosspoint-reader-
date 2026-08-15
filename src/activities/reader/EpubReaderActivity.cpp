@@ -195,9 +195,9 @@ void EpubReaderActivity::onEnter() {
   }
 
   // Save current epub as last opened epub and add to recent books
-  APP_STATE.openEpubPath = epub->getPath();
+  APP_STATE.openEpubPath = epub->getBookPath();
   APP_STATE.saveToFile();
-  RECENT_BOOKS.addBook(epub->getPath(), epub->getTitle(), epub->getAuthor(), epub->getThumbBmpPath());
+  RECENT_BOOKS.addBook(epub->getBookPath(), epub->getTitle(), epub->getAuthor(), epub->getThumbBmpPath());
 
   loadCachedBookmarks();
 
@@ -223,7 +223,7 @@ void EpubReaderActivity::onExit() {
 
   section.reset();
   if (pendingReadFolderMove && epub) {
-    const std::string srcPath = epub->getPath();
+    const std::string srcPath = epub->getBookPath();
     const std::string oldCachePath = epub->getCachePath();
     const std::string dstPath = buildReadFolderDestination(srcPath);
     epub.reset();  // release the Epub (and any open handles) before renaming on the SD card
@@ -330,10 +330,10 @@ void EpubReaderActivity::loop() {
     if (atEndOfBook && !recentsEntryRemoved) {
       // Only treat the book as "removed by us" if it was actually in the list, so the
       // re-add branch below doesn't insert a book the feature never removed.
-      recentsEntryRemoved = RECENT_BOOKS.removeByPath(epub->getPath());
+      recentsEntryRemoved = RECENT_BOOKS.removeByPath(epub->getBookPath());
     } else if (!atEndOfBook && recentsEntryRemoved) {
       // Re-add (goes to front of the list via addBook — accepted ordering side effect).
-      RECENT_BOOKS.addBook(epub->getPath(), epub->getTitle(), epub->getAuthor(), epub->getThumbBmpPath());
+      RECENT_BOOKS.addBook(epub->getBookPath(), epub->getTitle(), epub->getAuthor(), epub->getThumbBmpPath());
       recentsEntryRemoved = false;
     }
   }
@@ -343,7 +343,8 @@ void EpubReaderActivity::loop() {
   // finished). If removeReadBooksFromRecents also fired, RecentBooksStore::updatePath in the
   // move path becomes a safe no-op since the entry was already removed.
   if (atEndOfBook) {
-    pendingReadFolderMove = SETTINGS.moveFinishedToReadFolder && !isInReadFolder(epub->getPath());
+    pendingReadFolderMove = SETTINGS.moveFinishedToReadFolder && epub->getPath() == epub->getBookPath() &&
+                            !isInReadFolder(epub->getBookPath());
   } else {
     pendingReadFolderMove = false;
   }
@@ -450,7 +451,7 @@ void EpubReaderActivity::loop() {
 
   // Long press BACK (1s+) goes to file selection
   if (mappedInput.isPressed(MappedInputManager::Button::Back) && mappedInput.getHeldTime() >= ReaderUtils::GO_HOME_MS) {
-    activityManager.goToFileBrowser(epub ? epub->getPath() : "");
+    activityManager.goToFileBrowser(epub ? epub->getBookPath() : "");
     return;
   }
 
@@ -667,7 +668,7 @@ void EpubReaderActivity::onReaderMenuConfirm(EpubReaderMenuActivity::MenuAction 
   switch (action) {
     case EpubReaderMenuActivity::MenuAction::SELECT_CHAPTER: {
       const int spineIdx = currentSpineIndex;
-      const std::string path = epub->getPath();
+      const std::string path = epub->getBookPath();
       startActivityForResult(
           std::make_unique<EpubReaderChapterSelectionActivity>(renderer, mappedInput, epub, path, spineIdx),
           [this](const ActivityResult& result) {
@@ -764,7 +765,7 @@ void EpubReaderActivity::onReaderMenuConfirm(EpubReaderMenuActivity::MenuAction 
     }
     case EpubReaderMenuActivity::MenuAction::BOOKMARKS: {
       startActivityForResult(
-          std::make_unique<EpubReaderBookmarksActivity>(renderer, mappedInput, epub, epub->getPath()),
+          std::make_unique<EpubReaderBookmarksActivity>(renderer, mappedInput, epub, epub->getBookPath()),
           progressChangeResultHandler);
       break;
     }
@@ -794,7 +795,7 @@ bool EpubReaderActivity::launchKOReaderSync() {
   SavedProgressPosition localKoPos = ProgressMapper::toSavedProgress(epub, localPos);
   const int tocIdx = epub->getTocIndexForSpineIndex(currentSpineIndex);
   std::string localChapterName = (tocIdx >= 0) ? epub->getTocItem(tocIdx).title : "";
-  const std::string savedEpubPath = epub->getPath();
+  const std::string savedEpubPath = epub->getBookPath();
 
   // Persist current position so the reader resumes at the right page on return.
   // goToReader() depends on this file, so abort the sync if the write fails.
@@ -945,7 +946,7 @@ void EpubReaderActivity::render(RenderLock&& lock) {
   if (currentSpineIndex == epub->getSpineItemsCount()) {
     // Sole load site: runs on the render task (serialized by RenderLock); the main
     // task only reads the suggestions once the loaded flag is published
-    endOfBookOptions.loadOnce(epub->getPath());
+    endOfBookOptions.loadOnce(epub->getBookPath());
     renderer.clearScreen();
     endOfBookOptions.render(renderer, mappedInput);
     renderer.displayBuffer();
@@ -1616,7 +1617,7 @@ void EpubReaderActivity::loadCachedBookmarks() {
     return;
   }
 
-  const std::string bmPath = BookmarkUtil::getBookmarkPath(epub->getPath());
+  const std::string bmPath = BookmarkUtil::getBookmarkPath(epub->getBookPath());
   if (Storage.exists(bmPath.c_str())) {
     String json = Storage.readFile(bmPath.c_str());
     if (!json.isEmpty()) {
@@ -1669,7 +1670,7 @@ void EpubReaderActivity::addBookmark() {
     currentPageBookmarked = true;
   }
 
-  const std::string path = BookmarkUtil::getBookmarkPath(epub->getPath());
+  const std::string path = BookmarkUtil::getBookmarkPath(epub->getBookPath());
   const std::string bookmarksDir = BookmarkUtil::getBookmarksDir();
   Storage.mkdir(bookmarksDir.c_str());
   const bool ok = JsonSettingsIO::saveBookmarks(cachedBookmarks, path.c_str());

@@ -19,6 +19,10 @@ class Epub {
   std::string tocNavItem;
   // where is the EPUBfile?
   std::string filepath;
+  // Identity path used for navigation/recents/bookmarks. Defaults to filepath, but a wrapper
+  // format (e.g. a Markdown file rendered as a generated synthetic EPUB) can point this at the
+  // original source file so "back" returns to its folder rather than the cache.
+  std::string bookPath;
   // the base path for items in the EPUB file
   std::string contentBasePath;
   // Uniq cache key based on filepath
@@ -39,7 +43,11 @@ class Epub {
   bool generateThumbBmpAt(const std::string& thumbPath, int targetWidth, int targetHeight) const;
 
  public:
-  explicit Epub(std::string filepath, const std::string& cacheDir) : filepath(std::move(filepath)) {
+  explicit Epub(std::string filepath, const std::string& cacheDir, std::string bookPath = "")
+      : filepath(std::move(filepath)), bookPath(std::move(bookPath)) {
+    if (this->bookPath.empty()) {
+      this->bookPath = this->filepath;
+    }
     // create a cache key based on the filepath
     cachePath = cacheDir + "/epub_" + std::to_string(std::hash<std::string>{}(this->filepath));
   }
@@ -50,6 +58,7 @@ class Epub {
   void setupCacheDir() const;
   const std::string& getCachePath() const;
   const std::string& getPath() const;
+  [[nodiscard]] const std::string& getBookPath() const { return bookPath; }
   const std::string& getTitle() const;
   const std::string& getAuthor() const;
   const std::string& getLanguage() const;
